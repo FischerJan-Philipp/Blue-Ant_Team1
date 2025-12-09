@@ -20,7 +20,7 @@ class BlueAntAPI:
         """Holt alle Projekte von der API"""
         try:
             response = requests.get(
-                f"{self.base_url}/projects/778393700",
+                f"{self.base_url}/projects",
                 headers=self.headers,
                 timeout=10
             )
@@ -29,6 +29,44 @@ class BlueAntAPI:
         except requests.exceptions.RequestException as e:
             print(f"❌ API-Fehler: {e}")
             return None
+
+    def get_project_details(self, project_id: str) -> Optional[Dict]:
+        """Holt Detaildaten zu einem Projekt per ID"""
+        try:
+            response = requests.get(
+                f"{self.base_url}/projects/{project_id}",
+                headers=self.headers,
+                timeout=10
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            print(f"❌ API-Fehler für Projekt {project_id}: {e}")
+            return None
+
+    def get_project_names_and_ids(self) -> List[Dict[str, str]]:
+        """Gibt eine Liste von Dicts mit Projektnamen und IDs zurück"""
+        data = self.get_projects()
+        if not data:
+            return []
+
+        projects = data.get("projects", [])
+        results: List[Dict[str, str]] = []
+
+        for project in projects:
+            pid = project.get("id")
+            if not pid:
+                continue
+
+            details = self.get_project_details(pid)
+            if not details:
+                continue
+
+            name = details.get("name") or details.get("project", {}).get("name")
+            # Fallback: falls Name nicht vorhanden, nur ID speichern
+            results.append({"id": pid, "name": name or "Unbekannt"})
+
+        return results
 
     def save_projects_to_file(self, filename: str = "projects.json"):
         """Speichert Projekte in eine JSON-Datei"""
@@ -100,6 +138,17 @@ if __name__ == "__main__":
 
         # Projekt-Zusammenfassung anzeigen
         api.print_project_summary()
+
+        # Namen und IDs tabellarisch ausgeben
+        table = api.get_project_names_and_ids()
+        if table:
+            print(f"\n{'=' * 80}")
+            print(f"📋 Projektnamen und IDs")
+            print(f"{'=' * 80}")
+            for row in table:
+                print(f"ID: {row['id']} | Name: {row['name']}")
+        else:
+            print("Keine Projektnamen/IDs abrufbar.")
 
         # Optional: In Datei speichern
         # api.save_projects_to_file("blueant_projects.json")
